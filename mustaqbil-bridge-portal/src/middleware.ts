@@ -1,22 +1,35 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
 
-const PROTECTED_PREFIXES = ['/tasks', '/team'];
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({ request })
 
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  if (PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    const authCookie = request.cookies.get('sb-access-token');
-
-    if (!authCookie) {
-      const loginUrl = new URL('/login', request.url);
-      return NextResponse.redirect(loginUrl);
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookiesToSet) => {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
     }
-  }
+  )
 
-  return NextResponse.next();
+  const { data: { user } } = await supabase.auth.getUser()
+  const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+
+  if (!user && !isLoginPage) return NextResponse.redirect(new URL('/login', request.url))
+  if (user && isLoginPage) return NextResponse.redirect(new URL('/', request.url))
+
+  return response
 }
 
 export const config = {
-  matcher: ['/tasks/:path*', '/team/:path*'],
-};
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
