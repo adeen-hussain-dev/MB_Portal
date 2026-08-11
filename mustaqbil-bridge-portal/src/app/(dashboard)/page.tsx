@@ -10,30 +10,30 @@ export default function DashboardPage() {
   return (
     <section className="space-y-8">
       <header className="space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-400">Operations overview</p>
-        <h1 className="text-3xl font-semibold">Bridge coordination dashboard</h1>
-        <p className="max-w-2xl text-sm text-slate-400">
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#0F3F7F]">Operations overview</p>
+        <h1 className="font-heading text-3xl font-semibold text-[#101828]">Bridge coordination dashboard</h1>
+        <p className="max-w-2xl text-sm text-[#64748B]">
           Track tasks, review volunteer availability, and keep communication flowing across the branch team.
         </p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-3">
         {highlights.map((item) => (
-          <div key={item.title} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-            <p className="text-sm text-slate-400">{item.title}</p>
-            <p className="mt-2 text-3xl font-semibold">{item.value}</p>
-            <p className="mt-2 text-sm text-slate-500">{item.hint}</p>
+          <div key={item.title} className="rounded-2xl border border-[#D8E0EA] bg-white p-5 shadow-sm">
+            <p className="text-sm text-[#64748B]">{item.title}</p>
+            <p className="mt-2 font-heading text-3xl font-semibold text-[#0F3F7F]">{item.value}</p>
+            <p className="mt-2 text-sm text-[#64748B]">{item.hint}</p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-        <h2 className="text-xl font-semibold">Quick actions</h2>
+      <div className="rounded-2xl border border-[#D8E0EA] bg-white p-6 shadow-sm">
+        <h2 className="font-heading text-xl font-semibold text-[#101828]">Quick actions</h2>
         <div className="mt-4 flex flex-wrap gap-3">
-          <Link href="/tasks" className="rounded-lg bg-cyan-500 px-4 py-2 font-medium text-slate-950 transition hover:bg-cyan-400">
+          <Link href="/tasks" className="rounded-xl bg-[#0F3F7F] px-4 py-2.5 font-semibold text-white transition hover:bg-[#123f79]">
             View tasks
           </Link>
-          <Link href="/team" className="rounded-lg border border-slate-700 px-4 py-2 font-medium text-slate-200 transition hover:border-cyan-500 hover:text-cyan-400">
+          <Link href="/team" className="rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-2.5 font-semibold text-[#101828] transition hover:border-[#0F3F7F] hover:text-[#0F3F7F]">
             View volunteer directory
           </Link>
         </div>
