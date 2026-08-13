@@ -5,6 +5,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const lightLogoStyle = {
+  filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
+}
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -19,7 +23,7 @@ export default function LoginPage() {
       setError(error.message)
       return
     }
-    router.push('/')
+    router.replace('/tasks')
     router.refresh()
   }
 
@@ -27,7 +31,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
       <div className="page-fade w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
         <div className="flex flex-col items-center text-center">
-          <Image src="/logo.png" alt="Mustaqbil Bridge" width={176} height={62} priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={62} style={lightLogoStyle} priority />
           <h1 className="mt-8 font-heading text-3xl font-semibold tracking-tight">Sign in to the portal</h1>
           <p className="mt-2 text-sm leading-6 text-[#64748B]">Invite-only access for the Mustaqbil Bridge team.</p>
         </div>

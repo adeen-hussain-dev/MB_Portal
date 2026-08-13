@@ -31,7 +31,7 @@ export function Sidebar() {
     <>
       <div className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-[#0F3F7F] px-4 text-white shadow-sm lg:hidden">
         <Link href="/" className="inline-flex items-center">
-          <Image src="/logo.png" alt="Mustaqbil Bridge" width={128} height={42} />
+          <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={128} height={42} />
         </Link>
         <Button
           type="button"
@@ -48,7 +48,7 @@ export function Sidebar() {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 shrink-0 flex-col border-r border-white/10 bg-[#0F3F7F] px-6 py-6 text-white lg:flex">
         <div className="space-y-6">
           <Link href="/" className="inline-flex items-center">
-            <Image src="/logo.png" alt="Mustaqbil Bridge" width={176} height={62} priority />
+            <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={176} height={62} priority />
           </Link>
 
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
@@ -93,7 +93,7 @@ export function Sidebar() {
             <DialogHeader className="flex-row items-center justify-between gap-3">
               <DialogTitle className="sr-only">Navigation</DialogTitle>
               <Link href="/" className="inline-flex items-center">
-                <Image src="/logo.png" alt="Mustaqbil Bridge" width={148} height={50} />
+                <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={148} height={50} />
               </Link>
               <Button
                 type="button"

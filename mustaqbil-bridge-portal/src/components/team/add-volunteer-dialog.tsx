@@ -43,7 +43,7 @@ export function AddVolunteerDialog() {
         <div className="rounded-t-[inherit] bg-[#0F3F7F] px-6 py-5 text-white">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-              <Image src="/logo.png" alt="Mustaqbil Bridge" width={28} height={28} />
+              <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={28} height={28} />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-white/70">Team access</p>

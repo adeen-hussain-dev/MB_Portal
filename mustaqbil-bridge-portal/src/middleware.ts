@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     || request.nextUrl.pathname.startsWith('/auth/callback')
 
   if (!user && !isPublicPath) return NextResponse.redirect(new URL('/login', request.url))
-  if (user && request.nextUrl.pathname.startsWith('/login')) return NextResponse.redirect(new URL('/', request.url))
+  if (user && request.nextUrl.pathname.startsWith('/login')) return NextResponse.redirect(new URL('/tasks', request.url))
 
   return response
 }

@@ -5,6 +5,10 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+const lightLogoStyle = {
+  filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
+}
+
 export default function AuthCallback() {
   const [ready, setReady] = useState(false)
   const [password, setPassword] = useState('')
@@ -45,7 +49,7 @@ export default function AuthCallback() {
       return
     }
 
-    router.push('/')
+    router.replace('/tasks')
     router.refresh()
   }
 
@@ -53,7 +57,7 @@ export default function AuthCallback() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
         <div className="w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 text-center shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
-          <Image src="/logo.png" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" style={lightLogoStyle} priority />
           <h1 className="mt-8 font-heading text-2xl font-semibold">Invite link issue</h1>
           <p className="mt-3 text-sm leading-6 text-[#64748B]">
             This link looks invalid or expired. Ask an admin to send a fresh invite.
@@ -68,7 +72,7 @@ export default function AuthCallback() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
         <div className="w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 text-center shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
-          <Image src="/logo.png" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" style={lightLogoStyle} priority />
           <h1 className="mt-8 font-heading text-2xl font-semibold">Verifying invite</h1>
           <p className="mt-3 text-sm leading-6 text-[#64748B]">Please wait while we confirm your invite and prepare your account.</p>
         </div>
@@ -80,7 +84,7 @@ export default function AuthCallback() {
     <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
       <form onSubmit={handleSetPassword} className="w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
         <div className="text-center">
-          <Image src="/logo.png" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" style={lightLogoStyle} priority />
           <h1 className="mt-8 font-heading text-2xl font-semibold">Set your password</h1>
           <p className="mt-3 text-sm leading-6 text-[#64748B]">Choose a password for your invited Mustaqbil Bridge account.</p>
         </div>
