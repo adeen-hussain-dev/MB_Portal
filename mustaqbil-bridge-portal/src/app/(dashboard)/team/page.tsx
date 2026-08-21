@@ -4,7 +4,8 @@ import { fetchTasks } from '@/lib/portal-data'
 
 export default async function TeamPage() {
   const supabase = await createClient()
-  const [profilesResult, tasks] = await Promise.all([
+  const [{ data: { user } }, profilesResult, tasks] = await Promise.all([
+    supabase.auth.getUser(),
     supabase.from('profiles').select('*').order('created_at'),
     fetchTasks(),
   ])
@@ -14,6 +15,8 @@ export default async function TeamPage() {
   }
 
   const profiles = profilesResult.data ?? []
+  const currentProfile = profiles.find((p) => p.id === user?.id)
+  const isAdmin = currentProfile?.role === 'admin'
 
   const openTasksByEmail = tasks.reduce<Record<string, number>>((accumulator, task) => {
     if (task.status === 'done') return accumulator
@@ -31,7 +34,7 @@ export default async function TeamPage() {
           <h1 className="font-heading text-3xl font-semibold text-[#101828]">Team roster</h1>
           <p className="max-w-2xl text-sm text-[#64748B]">Add volunteers, review their roles, and flag open work before inactivation.</p>
         </div>
-        <AddVolunteerDialog />
+        {isAdmin && <AddVolunteerDialog />}
       </header>
 
       {profiles.length === 0 ? (

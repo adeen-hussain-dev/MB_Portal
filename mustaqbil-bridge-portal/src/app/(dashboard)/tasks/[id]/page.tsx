@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { fetchTaskById } from '@/lib/portal-data'
+import { CommentComposer } from '@/components/tasks/comment-composer'
 
 const statusStyles: Record<string, string> = {
   todo: 'bg-[#FFF4CC] text-[#8A5B00]',
@@ -77,9 +78,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             ))}
           </div>
 
-          <div className="mt-6 rounded-2xl border border-dashed border-[#D8E0EA] bg-[#F5F7FA] p-4 text-sm text-[#64748B]">
-            Comments composer and question routing will connect in the next module; the detail view is already structured for it.
-          </div>
+          <CommentComposer taskId={task.id} />
         </div>
 
         <aside className="space-y-4">
@@ -87,11 +86,26 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <h2 className="font-heading text-xl font-semibold text-[#101828]">Task file set</h2>
             <div className="mt-4 space-y-2">
               {task.attachments.length > 0 ? (
-                task.attachments.map((attachment) => (
-                  <div key={attachment} className="rounded-xl bg-[#F5F7FA] px-4 py-3 text-sm text-[#101828]">
-                    {attachment}
-                  </div>
-                ))
+                task.attachments.map((attachment) => {
+                  const isUrl = attachment.startsWith('http://') || attachment.startsWith('https://')
+                  const fileName = attachment.split('/').pop()?.split('_').slice(1).join('_') || attachment
+
+                  return isUrl ? (
+                    <a
+                      key={attachment}
+                      href={attachment}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate rounded-xl bg-[#F5F7FA] px-4 py-3 text-sm text-[#0F3F7F] transition hover:bg-[#EAF1FF] hover:underline"
+                    >
+                      📎 {fileName}
+                    </a>
+                  ) : (
+                    <div key={attachment} className="truncate rounded-xl bg-[#F5F7FA] px-4 py-3 text-sm text-[#101828]">
+                      📎 {attachment}
+                    </div>
+                  )
+                })
               ) : (
                 <p className="text-sm text-[#64748B]">No attachments yet.</p>
               )}

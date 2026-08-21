@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 
 const lightLogoStyle = {
   filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
+  width: 'auto',
+  height: 'auto',
 }
 
 export default function LoginPage() {

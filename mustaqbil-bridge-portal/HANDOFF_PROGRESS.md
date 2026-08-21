@@ -6,7 +6,7 @@ This project is a Next.js 16.3.0 App Router application for an internal task and
 
 Current state:
 - Frontend stack: Next.js 16.3.0, React 19, App Router, TypeScript
-- Styling: Tailwind CSS v4, custom brand tokens, shadcn-style component primitives
+- Styling: Tailwind CSS v4, custom brand tokens, shadcn-styXle component primitives
 - Auth + database: Supabase SSR + Supabase JS + service-role admin client
 - Build validation: `npm run build` succeeds in the current workspace
 - Important warnings remain: the `middleware` convention is deprecated in Next.js 16 and should eventually move to `proxy`; Supabase warns that Node 20 is below the recommended version for future compatibility

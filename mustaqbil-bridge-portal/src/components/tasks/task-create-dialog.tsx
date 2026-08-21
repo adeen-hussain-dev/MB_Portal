@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -43,7 +44,7 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [attachmentName, setAttachmentName] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -58,10 +59,59 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
     [assignees, form.assigneeEmail],
   )
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null
+    setError('')
+    if (file && file.size > 20 * 1024 * 1024) {
+      setError('File size exceeds the 20MB limit.')
+      setSelectedFile(null)
+      e.target.value = ''
+      return
+    }
+    setSelectedFile(file)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
+
+    const uploadedAttachments: string[] = []
+
+    if (selectedFile) {
+      if (selectedFile.size > 20 * 1024 * 1024) {
+        setError('File size exceeds the 20MB limit.')
+        setLoading(false)
+        return
+      }
+
+      try {
+        const uploadFormData = new FormData()
+        uploadFormData.append('file', selectedFile)
+
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: uploadFormData,
+        })
+
+        if (!uploadRes.ok) {
+          const errPayload = await uploadRes.json()
+          setError(errPayload.error || 'File upload failed')
+          setLoading(false)
+          return
+        }
+
+        const uploadResult = await uploadRes.json()
+        if (uploadResult.url) {
+          uploadedAttachments.push(uploadResult.url)
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Upload failed'
+        setError(`Attachment upload failed: ${msg}`)
+        setLoading(false)
+        return
+      }
+    }
 
     const res = await fetch('/api/tasks', {
       method: 'POST',
@@ -70,7 +120,7 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
         ...form,
         assigneeName: selectedAssignee?.full_name ?? 'Unassigned',
         assigneeEmail: selectedAssignee?.email ?? '',
-        attachmentName,
+        attachments: uploadedAttachments,
       }),
     })
 
@@ -85,7 +135,7 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
     const createdTask = await res.json()
     onCreated(createdTask)
     setOpen(false)
-    setAttachmentName('')
+    setSelectedFile(null)
     setForm({
       title: '',
       description: '',
@@ -98,11 +148,13 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button className="rounded-xl bg-[#FFC107] px-4 py-2.5 font-semibold text-[#0F3F7F] hover:bg-[#ffcb2f]">
-          + New task
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button className="rounded-xl bg-[#FFC107] px-4 py-2.5 font-semibold text-[#0F3F7F] hover:bg-[#ffcb2f]">
+            + New task
+          </Button>
+        }
+      />
 
       <DialogContent className="border border-[#D8E0EA] bg-white p-0 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)] sm:max-w-2xl">
         <div className="bg-[#0F3F7F] px-6 py-5 text-white">
@@ -181,17 +233,17 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
           </div>
 
           <label className="block text-sm font-medium text-[#101828]">
-            <span className="mb-2 block text-[#64748B]">Attachment upload</span>
+            <span className="mb-2 block text-[#64748B]">Attachment upload (max 20MB)</span>
             <input
               type="file"
-              onChange={(e) => setAttachmentName(e.target.files?.[0]?.name ?? '')}
+              onChange={handleFileChange}
               className="block w-full cursor-pointer rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 text-sm text-[#64748B] file:mr-4 file:rounded-lg file:border-0 file:bg-[#0F3F7F] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
             />
-            <span className="mt-2 block text-xs text-[#64748B]">Selected file name is stored with the task for now; storage upload comes next.</span>
+            <span className="mt-2 block text-xs text-[#64748B]">File will be uploaded directly to Supabase Storage bucket &apos;task-attachments&apos;.</span>
           </label>
 
-          {attachmentName && (
-            <p className="text-sm text-[#0F3F7F]">Selected file: {attachmentName}</p>
+          {selectedFile && (
+            <p className="text-sm text-[#0F3F7F]">Selected file: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)</p>
           )}
 
           {error && <p className="text-sm text-[#DC2626]">{error}</p>}

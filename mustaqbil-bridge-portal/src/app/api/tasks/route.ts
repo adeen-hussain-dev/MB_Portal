@@ -40,6 +40,7 @@ export async function POST(request: Request) {
       priority: body.priority ?? 'medium',
       dueDate: body.dueDate,
       attachmentName: body.attachmentName ?? '',
+      attachments: Array.isArray(body.attachments) ? body.attachments : (body.attachmentName ? [body.attachmentName] : []),
     });
 
     return NextResponse.json(task, { status: 201 });

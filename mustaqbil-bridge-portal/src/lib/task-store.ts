@@ -34,6 +34,7 @@ export type TaskInput = {
   priority: TaskPriority
   dueDate: string
   attachmentName?: string
+  attachments?: string[]
 }
 
 export type TaskRow = {

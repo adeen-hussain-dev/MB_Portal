@@ -36,9 +36,11 @@ export function AddVolunteerDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button className="rounded-full bg-[#FFC107] text-[#0F3F7F] hover:bg-[#ffcb2f]">+ Add Volunteer</Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button className="rounded-full bg-[#FFC107] text-[#0F3F7F] hover:bg-[#ffcb2f]">+ Add Volunteer</Button>
+        }
+      />
       <DialogContent className="border border-[#D8E0EA] bg-white p-0 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
         <div className="rounded-t-[inherit] bg-[#0F3F7F] px-6 py-5 text-white">
           <div className="flex items-center gap-3">

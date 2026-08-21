@@ -116,7 +116,7 @@ export async function createTask(input: TaskInput) {
       priority: input.priority,
       due_date: input.dueDate,
       status: 'todo',
-      attachments: input.attachmentName ? [input.attachmentName] : [],
+      attachments: input.attachments ?? (input.attachmentName ? [input.attachmentName] : []),
     })
     .select('*')
     .single()
