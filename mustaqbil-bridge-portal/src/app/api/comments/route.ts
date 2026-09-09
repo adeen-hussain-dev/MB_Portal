@@ -31,9 +31,8 @@ export async function POST(request: Request) {
     .from('task_comments')
     .insert({
       task_id: taskId,
-      author_name: profile?.full_name ?? user.email ?? 'Team Member',
-      author_role: profile?.role ?? 'volunteer',
-      content: content.trim(),
+      user_id: user.id,
+      comment: content.trim(),
     })
     .select('*')
     .single()

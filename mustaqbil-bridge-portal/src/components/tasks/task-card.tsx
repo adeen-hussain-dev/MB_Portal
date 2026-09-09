@@ -54,19 +54,18 @@ export function TaskCard({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 border-t border-[#E6EDF5] pt-4 md:grid-cols-4">
+      <div className="mt-5 grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 border-t border-[#E6EDF5] pt-4">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[#64748B]">Assignee</p>
-          <p className="mt-1 text-sm font-medium text-[#101828]">{assigneeName}</p>
-          <p className="text-xs text-[#64748B]">{assigneeEmail}</p>
+          <p className="mt-1 text-sm font-medium text-[#101828]">{assigneeName || 'Unassigned'}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[#64748B]">Domain</p>
-          <p className="mt-1 text-sm font-medium text-[#101828]">{domain}</p>
+          <p className="mt-1 text-sm font-medium text-[#101828]">{domain || '—'}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[#64748B]">Due date</p>
-          <p className="mt-1 text-sm font-medium text-[#101828]">{dueDate}</p>
+          <p className="mt-1 text-sm font-medium text-[#101828]">{dueDate || '—'}</p>
         </div>
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[#64748B]">Attachments</p>

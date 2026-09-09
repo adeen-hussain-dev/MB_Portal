@@ -118,23 +118,26 @@ Centered card on a Mist background. Logo above the form. Amber submit button. No
 
 ## 6. Modules
 
-### ✅ Built
-1. **Project setup** — Next.js + Supabase + shadcn scaffolding
-2. **Database schema v1** — core tables + RLS
-3. **Auth** — invite-only signup, Gmail SMTP, login page, `/auth/callback` (set password), middleware route protection
-4. **Team directory (read)** — lists profiles with Active/Invited status; "Add Volunteer" visible to admin only
+### ✅ Built and verified (real tests, not just code review)
+1. **Project setup**
+2. **Database schema v1**
+3. **Auth** — invite-only signup, Gmail SMTP, login, `/auth/callback`, `proxy.ts` route protection
+4. **Team directory** — RLS-verified with real throwaway accounts
+5. **Task creation + assignment** — including real file attachments (RLS-verified)
+6. **Comment composer** — verified with real comments posted by manager and volunteer
+7. **Kanban board** — drag-and-drop, drag-to-approve removed, Review modal, responsive layout
+8. **Approval flow** — `changes_requested`, `approved_by`/`approved_at`, rejection reason saved as a comment
+9. **Questions** (`task_questions`) — volunteer asks on a task, routed to manager/admin, answer flow with live `answeredByName` and RLS enforcement
+11a/b. **Email — task assigned & due-tomorrow reminder** — confirmed via real inbox + real cron auth checks, with same-day dedup via `activity_log`
+11c/d. **Email — question raised & question answered** — branded Nodemailer emails dispatched on question ask and answer, verified via real Gmail IMAP
+12. **Profile page** — avatar upload and password change verified with real accounts
+12A/B/C. **Section 12 Requirements** — late-submission reason, hybrid attachments (files & external links), satisfaction rating (1-10) with updated leaderboard formula
 
-### ⬜ To build, in this order (see §8 for why this order)
-5. **Task creation + assignment** — form with title, description, assignee, priority, due date, domain; attachment upload
-6. **Task list + detail view** — table view, single-task page with comments
-7. **Kanban board** — drag-drop across the 5 statuses, respecting the transition rules in §3
-8. **Approval flow** — the "review" action for managers/admin: **Approve** (→ done) needs no input; **Request changes** (→ changes requested) requires the manager to type a reason in a text box before submitting — that text is saved as a comment on the task so the volunteer sees exactly what to fix
-9. **Questions** — volunteer asks on a task, routed to manager/admin, answer flow
-10. **Notifications (in-app)** — bell icon, unread count, list, mark-as-read
-11. **Email notifications** — task assigned, due-tomorrow reminder (daily cron), question raised, question answered — each its own template, sent via Nodemailer/Gmail
-12. **Profile module** — change password, change photo; volunteer view is read-only for name/email/phone/domain
-13. **Admin/Manager dashboard** — volunteer performance bar chart + "this month's best volunteer" (computed live from `tasks` where `status = 'done' and approved_at` is in the current month — no separate stats table needed at this scale)
-14. **Landing page** — built last, once the product itself is real and there's something true to show/animate
+### ⬜ Not started / Next up
+10. **Notifications (in-app)** — bell icon, unread count badge, interactive dropdown list, mark-as-read, realtime sync
+
+### ✅ Exists (built ahead of planned order)
+14. **Landing page** — live, branded; the signature animated "bridge line" is still pending as polish, not urgent
 
 Each module = its own PR/commit, testable in isolation before moving to the next.
 
@@ -165,21 +168,47 @@ Task creation has to exist before Kanban has anything to show. Kanban has to exi
 - Volunteers have **no edit access to their own profile fields either**, except their photo — name/email/phone/domain are read-only for them too, editable by admin only.
 - `changes_requested` status confirmed — and rejecting a review requires the manager to type a reason (see §5 and Module 8 above).
 - Custom emails (assigned, reminders, questions) go out via **Nodemailer + the existing Gmail App Password** — no Resend/new domain needed for now.
-- Logo is ready — share the file when we reach the landing page module (§6, built last); until then the wordmark placeholder in §4 stands.
+- Logo is ready — drop the file into the project (e.g. `public/logo.svg`) whenever convenient; Module 14 will use it directly, no wordmark placeholder needed.
+- **Reassignment**: both admin and manager can reassign a task to a different volunteer after creation — same authority they already have to assign it in the first place.
+- **Inactive volunteers**: reassignment of their open tasks stays **manual** — when a volunteer is set to inactive, show admin/manager a warning with their open-task count so nothing gets silently dropped. No auto-reassignment.
+- **Time zone**: due dates and the "due tomorrow" reminder run on **Pakistan time (PKT, UTC+5)**, not UTC. Since Vercel Cron only fires in UTC, offset the schedule accordingly (e.g. a 9:00 AM PKT reminder = `0 4 * * *` in `vercel.json`), and do the "is due_date tomorrow" comparison in PKT inside the route, not against the server's UTC "today."
+- **Search/filter**: fold basic status/assignee filters into Module 6 (task list) now, since it's cheap to add alongside the list view itself. Full-text search stays deferred until it's actually needed.
+- **Activity log granularity**: log **every** status change, not just final review transitions — a complete audit trail, since the trigger already fires on any status update anyway.
 
 ## 9a. Remaining assumptions (flag if wrong)
 
 - Task attachments capped at ~20MB/file (soft limit, enforced client-side) to protect the 1GB free storage quota.
 
-## 10. Open questions (need your answer before/while building the relevant module)
+## 10. Housekeeping before Module 5
 
-- **Reassignment** — can admin/manager reassign a task to a different volunteer after it's created?
-- **Inactive volunteers** — when a volunteer's status is set to inactive, what happens to their open tasks — manual reassignment, or automatic?
-- **Time zone** — due dates and the "due tomorrow" reminder — should these run on Pakistan time (PKT) rather than UTC? (Vercel Cron only runs in UTC, so we'll need to offset the query.)
-- **Search/filter** on the task list and directory — not mentioned yet; worth having once task count grows past a page or two.
+- Clean up the stray pasted-text block currently inside `src/app/auth/callback/page.tsx` before building further on top of it.
 
 ---
 
-## 11. What changes if a future instruction changes DB or file structure
+## 12. New requirements (added after Module 8) — schema changes called out separately
 
-Going forward, any new requirement that touches the database or the file layout will be called out **separately, right under the requirement**, the same way §5 does above — not buried in general text — so you always know exactly what to run in Supabase or where to create a file before moving on.
+### A. Late-submission reason (no new column)
+When a volunteer moves a task to `in_review` and `due_date` (in PKT) has already passed, require a typed reason before the submission commits. Insert it as a `task_comment` tagged `[Late Submission]: ...`, same pattern as the rejection reason. **Enforce in both places that can trigger this transition — Kanban drag AND the task-detail dropdown — and enforce server-side in the PATCH route, not just in a UI modal**, to avoid the same multi-entry-point bug we already fixed once for done/changes_requested.
+
+### B. Task submission attachments — hybrid storage approach
+- Images, Excel, Word/PDF: direct upload to the existing `task-attachments` bucket (20MB/file cap already in place).
+- Video/reels: **no file upload** — add a plain URL field instead (Google Drive share link or unlisted YouTube link). Reason: Supabase's free storage is capped at 1GB total; video files would exhaust it quickly, while Google Drive alone gives 15GB free per account.
+- **Schema change**: extend `task_attachments` rather than adding a new table:
+  ```sql
+  alter table task_attachments
+    add column if not exists attachment_type text not null default 'file'
+    check (attachment_type in ('file', 'link'));
+  ```
+  For `'file'` rows, `file_url` is the Storage path as today. For `'link'` rows, `file_url` holds the pasted Google Drive/YouTube URL and `file_name` holds whatever label the user gives it (e.g. "Career Fair Reel").
+
+### C. Task satisfaction rating (new column + leaderboard change) — CONFIRMED
+- New column: `tasks.satisfaction_rating integer` (1–10), nullable, set only at approval time.
+- **Confirmed**: both admin and manager can set this (not admin-only as first assumed), and it's **mandatory** — the approve action is rejected server-side if it's missing or out of range.
+- Leaderboard formula (§13/Module 13), confirmed as proposed:
+  `score = (completed × 10) + (on_time × 5) - (rejections × 5) + (avg_rating × 3)`
+
+---
+
+## 13. What changes if a future instruction changes DB or file structure
+
+Going forward, any new requirement that touches the database or the file layout will be called out **separately, right under the requirement**, the same way §5 and §12 do above — not buried in general text — so you always know exactly what to run in Supabase or where to create a file before moving on.

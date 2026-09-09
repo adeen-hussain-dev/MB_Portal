@@ -154,10 +154,12 @@ This is partially in place but should be treated as a work-in-progress:
 - Need final hardened behavior for comment flows and task status transitions
 
 ### Module 7 — Kanban board (`@dnd-kit` drag-and-drop integration)
-Not yet implemented end-to-end:
-- `@dnd-kit` is already installed in `package.json`
-- A `kanban-board.tsx` component exists, but it is not connected to live task state or DB mutation logic
-- Must support the 5-state transition workflow and enforce task rules
+✅ Completed & Verified:
+- Built full 5-column interactive board (`todo`, `in_progress`, `in_review`, `changes_requested`, `done`) using `@dnd-kit/core` and `@dnd-kit/sortable`.
+- Implemented role-based transition validation (volunteers can only transition their assigned tasks between `todo` <-> `in_progress` -> `in_review`; only admin/manager can approve to `done` or request changes).
+- Integrated optimistic UI dragging with live Supabase persistence via `PATCH /api/tasks/[id]` and automatic error rollback.
+- Added segmented view switcher (`[ Kanban Board | List View ]`) to `TaskWorkspace`.
+- Verified production build via `npm run build` (exit code 0).
 
 ### Module 8 — Approval flow (`changes_requested` status, rejection reason requirement)
 Not yet built:
@@ -248,6 +250,51 @@ This section is critical for handoff continuity.
 
 ---
 
-## End-of-Report Notes
+## 6. Verification Record: Section 12 Requirements (§12A, §12B, §12C)
 
-This handoff reflects the actual codebase as it exists now. The foundation is live and verified, the portal shell and auth flow are working, and the project is ready for the next module in the ordered roadmap. The most important next move is to continue with Module 5 in sequence, without skipping ahead into kanban, notifications, or analytics until the task creation and route logic have been fully hardened and verified.
+### A. Late-Submission Reason (§12A) - VERIFIED
+- Enforced server-side in `PATCH /api/tasks/[id]` and in both client trigger paths (Kanban drag-and-drop and Task Detail dropdown).
+- Strict PKT calendar arithmetic used (`Intl.DateTimeFormat` with `timeZone: 'Asia/Karachi'`).
+- Missing or whitespace-only reason rejected with HTTP 400.
+- Valid reason accepted with HTTP 200 and automatically written to `task_comments` with `[Late Submission]: <reason>`.
+
+### B. Hybrid Attachments (§12B) - VERIFIED
+- Supported both file uploads (Storage paths) and external video/cloud links (Google Drive / YouTube links).
+- Populates `attachmentDetails` with `attachmentType: 'file' | 'link'`.
+- Verified via `GET /api/tasks/:id` returning structured details with active external link handling.
+
+### C. Satisfaction Rating (§12C) - VERIFIED
+- Mandatory 1–10 satisfaction rating required for task approval (`status = 'done'`).
+- Missing or out-of-range rating rejected with HTTP 400.
+- Rating 1–10 saves successfully with HTTP 200.
+- Leaderboard formula updated to: `score = (completed * 10) + (on_time * 5) - (rejections * 5) + (avg_rating * 3)`.
+
+### Clean Database State
+- All temporary test tasks and associated rows deleted. Database verified at 0 leftover tasks.
+
+---
+
+## 7. Verification Record: Module 9 (Volunteer Q&A - `task_questions`) — VERIFIED
+
+### Schema & Policies
+- `task_questions` table created with columns `id`, `task_id`, `asked_by`, `question`, `answered_by`, `answer`, `status` ('open'|'answered'), `created_at`, `answered_at`.
+- RLS enabled with policies using `get_my_role()` to prevent recursive subqueries.
+
+### Components & Routes
+- API Routes:
+  - `POST /api/questions`: enforces assignee authentication (`task.assignee_id === user.id`), inserts into `task_questions`, triggers `sendQuestionAskedEmail()`.
+  - `PATCH /api/questions/[id]/answer`: restricts answering to `admin` / `manager`, updates question row with answer details, triggers `sendQuestionAnsweredEmail()`.
+- UI Components:
+  - `src/components/tasks/task-questions.tsx`: Dedicated Q&A section with status badges (Amber Open, Emerald Answered), volunteer ask modal/composer, manager inline answer composer.
+  - `src/app/(dashboard)/tasks/[id]/page.tsx`: Embedded separate from Comments & Feedback.
+- Email Notifications:
+  - `sendQuestionAskedEmail()` dispatches branded email with task link to all admin/manager accounts.
+  - `sendQuestionAnsweredEmail()` dispatches branded email to the asking volunteer.
+
+### Live End-to-End Verification (`scratch/verify_module9_e2e.mjs`)
+- **Test 1**: Volunteer asks question on assigned task via `POST /api/questions` -> HTTP 201, verified row in `task_questions`, verified email dispatch via IMAP (Message-ID: `c086f9d4-7769-563f-5680-31f0e95eaef7@gmail.com`).
+- **Test 2**: Unassigned volunteer attempts question on same task -> HTTP 403 Forbidden (`"Only the assigned volunteer can ask questions on this task"`).
+- **Test 3**: Manager answers question via `PATCH /api/questions/[id]/answer` -> HTTP 200, row updated with `status = 'answered'`, `answered_by`, `answered_at`, verified email dispatch via IMAP (Message-ID: `a42b74ca-07e5-7590-2df5-2165efa42af3@gmail.com`).
+- **Test 4**: `GET /api/tasks/:id` returns questions array with complete author and answer metadata.
+- **Test 5**: Cleaned up all test data. Verified `tasks count = 0, task_questions count = 0`.
+

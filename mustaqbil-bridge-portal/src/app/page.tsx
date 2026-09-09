@@ -11,7 +11,7 @@ const stages = [
 const lightLogoStyle = {
   filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
   width: 'auto',
-  height: 'auto',
+  // height: 'auto',
 };
 
 export default function Home() {
@@ -25,7 +25,7 @@ export default function Home() {
     >
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-6 lg:px-10">
         <header className="flex items-center justify-between gap-4">
-          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={184} height={64} style={lightLogoStyle} priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={200} height={54} style={lightLogoStyle} priority />
           <Link
             href="/login"
             className="inline-flex items-center justify-center rounded-full bg-[#FFC107] px-5 py-2.5 text-sm font-semibold text-[#0F3F7F] shadow-[0_10px_30px_-16px_rgba(15,63,127,0.5)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_-18px_rgba(15,63,127,0.55)]"

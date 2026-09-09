@@ -1,34 +1,80 @@
 'use client'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const lightLogoStyle = {
   filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
   width: 'auto',
-  height: 'auto',
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirectTo')
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+    setLoading(true)
+    setError('')
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
+      setLoading(false)
       return
     }
-    router.replace('/tasks')
+    const destination = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/tasks'
+    router.replace(destination)
     router.refresh()
   }
 
+  return (
+    <form onSubmit={handleLogin} className="mt-8 space-y-4">
+      <label className="block text-sm font-medium text-[#101828]">
+        <span className="mb-2 block text-[#64748B]">Email</span>
+        <input
+          className="w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="volunteer@example.com"
+          required
+        />
+      </label>
+
+      <label className="block text-sm font-medium text-[#101828]">
+        <span className="mb-2 block text-[#64748B]">Password</span>
+        <input
+          className="w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          required
+        />
+      </label>
+
+      {error && <p className="text-sm text-[#DC2626]">{error}</p>}
+
+      <button
+        disabled={loading}
+        className="w-full rounded-xl bg-[#FFC107] px-4 py-3 font-semibold text-[#0F3F7F] transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_-20px_rgba(15,63,127,0.45)] disabled:opacity-50"
+        type="submit"
+      >
+        {loading ? 'Signing in...' : 'Sign in'}
+      </button>
+    </form>
+  )
+}
+
+export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
       <div className="page-fade w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
@@ -38,37 +84,9 @@ export default function LoginPage() {
           <p className="mt-2 text-sm leading-6 text-[#64748B]">Invite-only access for the Mustaqbil Bridge team.</p>
         </div>
 
-        <form onSubmit={handleLogin} className="mt-8 space-y-4">
-          <label className="block text-sm font-medium text-[#101828]">
-            <span className="mb-2 block text-[#64748B]">Email</span>
-            <input
-              className="w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="volunteer@example.com"
-              required
-            />
-          </label>
-
-          <label className="block text-sm font-medium text-[#101828]">
-            <span className="mb-2 block text-[#64748B]">Password</span>
-            <input
-              className="w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-          </label>
-
-          {error && <p className="text-sm text-[#DC2626]">{error}</p>}
-
-          <button className="w-full rounded-xl bg-[#FFC107] px-4 py-3 font-semibold text-[#0F3F7F] transition hover:-translate-y-0.5 hover:shadow-[0_16px_35px_-20px_rgba(15,63,127,0.45)]" type="submit">
-            Sign in
-          </button>
-        </form>
+        <Suspense fallback={<div className="py-8 text-center text-sm text-[#64748B]">Loading sign-in form...</div>}>
+          <LoginForm />
+        </Suspense>
 
         <p className="mt-6 text-center text-sm text-[#64748B]">Need access? Ask an admin to send you an invite.</p>
 

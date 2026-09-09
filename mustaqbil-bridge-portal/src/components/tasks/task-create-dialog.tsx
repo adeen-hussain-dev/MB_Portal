@@ -1,12 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { TaskPriority } from '@/lib/task-store'
+import { PlusIcon, Trash2Icon } from 'lucide-react'
 
 type Assignee = {
   id: string
@@ -34,6 +34,15 @@ type TaskCreateDialogProps = {
   }) => void
 }
 
+const defaultDomains = [
+  'Graphic Design',
+  'Web Development',
+  'Content & Copywriting',
+  'Social Media & Outreach',
+  'Video Editing',
+  'Event Management',
+]
+
 const priorityOptions: Array<{ value: TaskPriority; label: string }> = [
   { value: 'low', label: 'Low' },
   { value: 'medium', label: 'Medium' },
@@ -45,18 +54,49 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  
+  // Domains list & domain manager state
+  const [domains, setDomains] = useState<string[]>(defaultDomains)
+  const [showDomainManager, setShowDomainManager] = useState(false)
+  const [newDomainInput, setNewDomainInput] = useState('')
+  const [domainLoading, setDomainLoading] = useState(false)
+
+  // Filter so ONLY volunteers are assignable (managers review, volunteers execute)
+  const volunteerAssignees = useMemo(
+    () => assignees.filter((assignee) => assignee.role === 'volunteer'),
+    [assignees],
+  )
+
+  // Form initialized with empty/null values — NO prefilled defaults
   const [form, setForm] = useState({
     title: '',
     description: '',
-    assigneeEmail: assignees[0]?.email ?? '',
-    priority: 'medium' as TaskPriority,
+    assigneeEmail: '',
+    priority: '' as TaskPriority | '',
     dueDate: '',
     domain: '',
   })
 
+  const [videoLink, setVideoLink] = useState('')
+  const [videoLabel, setVideoLabel] = useState('')
+
+  // Load domains from API when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetch('/api/domains')
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.domains) && data.domains.length > 0) {
+            setDomains(data.domains)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [open])
+
   const selectedAssignee = useMemo(
-    () => assignees.find((assignee) => assignee.email === form.assigneeEmail),
-    [assignees, form.assigneeEmail],
+    () => volunteerAssignees.find((assignee) => assignee.email === form.assigneeEmail),
+    [volunteerAssignees, form.assigneeEmail],
   )
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -71,12 +111,73 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
     setSelectedFile(file)
   }
 
+  async function handleAddDomain(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newDomainInput.trim()) return
+
+    const name = newDomainInput.trim()
+    setDomainLoading(true)
+
+    try {
+      const res = await fetch('/api/domains', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+
+      setDomainLoading(false)
+
+      if (res.ok) {
+        setDomains((prev) => Array.from(new Set([...prev, name])))
+        setForm((f) => ({ ...f, domain: name }))
+        setNewDomainInput('')
+        setShowDomainManager(false)
+      }
+    } catch {
+      setDomainLoading(false)
+    }
+  }
+
+  async function handleDeleteDomain(nameToDelete: string) {
+    try {
+      await fetch('/api/domains', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameToDelete }),
+      })
+      setDomains((prev) => prev.filter((d) => d !== nameToDelete))
+      if (form.domain === nameToDelete) {
+        setForm((f) => ({ ...f, domain: '' }))
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
+    if (!form.assigneeEmail) {
+      setError('Please select an assignee.')
+      return
+    }
+    if (!form.domain) {
+      setError('Please select a domain/field.')
+      return
+    }
+    if (!form.priority) {
+      setError('Please select a priority level.')
+      return
+    }
+    if (!form.dueDate) {
+      setError('Please select a due date.')
+      return
+    }
+
     setLoading(true)
     setError('')
 
-    const uploadedAttachments: string[] = []
+    const uploadedAttachments: Array<{ fileUrl: string; fileName: string; attachmentType: 'file' | 'link' }> = []
 
     if (selectedFile) {
       if (selectedFile.size > 20 * 1024 * 1024) {
@@ -103,7 +204,11 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
 
         const uploadResult = await uploadRes.json()
         if (uploadResult.url) {
-          uploadedAttachments.push(uploadResult.url)
+          uploadedAttachments.push({
+            fileUrl: uploadResult.url,
+            fileName: selectedFile.name,
+            attachmentType: 'file',
+          })
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Upload failed'
@@ -113,13 +218,22 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
       }
     }
 
+    if (videoLink.trim()) {
+      uploadedAttachments.push({
+        fileUrl: videoLink.trim(),
+        fileName: videoLabel.trim() || 'Video Submission Link',
+        attachmentType: 'link',
+      })
+    }
+
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...form,
-        assigneeName: selectedAssignee?.full_name ?? 'Unassigned',
-        assigneeEmail: selectedAssignee?.email ?? '',
+        assigneeId: selectedAssignee?.id,
+        assigneeName: selectedAssignee?.full_name ?? 'Volunteer',
+        assigneeEmail: selectedAssignee?.email ?? form.assigneeEmail,
         attachments: uploadedAttachments,
       }),
     })
@@ -136,11 +250,13 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
     onCreated(createdTask)
     setOpen(false)
     setSelectedFile(null)
+    setVideoLink('')
+    setVideoLabel('')
     setForm({
       title: '',
       description: '',
-      assigneeEmail: assignees[0]?.email ?? '',
-      priority: 'medium',
+      assigneeEmail: '',
+      priority: '',
       dueDate: '',
       domain: '',
     })
@@ -156,103 +272,224 @@ export function TaskCreateDialog({ assignees, onCreated }: TaskCreateDialogProps
         }
       />
 
-      <DialogContent className="border border-[#D8E0EA] bg-white p-0 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)] sm:max-w-2xl">
-        <div className="bg-[#0F3F7F] px-6 py-5 text-white">
+      <DialogContent className="w-[calc(100%-1.5rem)] border border-[#D8E0EA] bg-white p-0 shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)] sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
+        <div className="bg-[#0F3F7F] px-4 py-4 sm:px-6 sm:py-5 text-white shrink-0">
           <DialogHeader>
             <p className="text-xs uppercase tracking-[0.24em] text-white/70">Module 5</p>
-            <DialogTitle className="mt-2 font-heading text-2xl text-white">Create and assign a task</DialogTitle>
-            <DialogDescription className="mt-2 text-sm text-white/80">
-              Add the title, owner, priority, due date, and supporting file before sending it to the queue.
+            <DialogTitle className="mt-1 font-heading text-xl sm:text-2xl text-white">Create and assign a task</DialogTitle>
+            <DialogDescription className="mt-1 text-xs sm:text-sm text-white/80">
+              Fill in all task details, assign to a team volunteer, and attach supporting files.
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              placeholder="Task title"
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                Task Title *
+              </label>
+              <Input
+                placeholder="Enter title..."
+                required
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                className="h-11 rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                  Domain / Field *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowDomainManager(!showDomainManager)}
+                  className="text-xs font-semibold text-[#0F3F7F] hover:underline"
+                >
+                  {showDomainManager ? 'Close manager' : '+ Add domain'}
+                </button>
+              </div>
+
+              {showDomainManager ? (
+                <div className="rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="New domain name..."
+                      value={newDomainInput}
+                      onChange={(e) => setNewDomainInput(e.target.value)}
+                      className="h-9 rounded-lg border-[#D8E0EA] bg-white text-xs"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddDomain}
+                      disabled={domainLoading || !newDomainInput.trim()}
+                      className="h-9 rounded-lg bg-[#0F3F7F] px-3 text-xs text-white"
+                    >
+                      {domainLoading ? 'Adding...' : 'Add'}
+                    </Button>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto space-y-1 pt-1">
+                    {domains.map((d) => (
+                      <div key={d} className="flex items-center justify-between text-xs text-[#101828] bg-white px-2 py-1 rounded">
+                        <span>{d}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDomain(d)}
+                          className="text-[#DC2626] hover:opacity-75"
+                        >
+                          <Trash2Icon className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Select value={form.domain} onValueChange={(val) => setForm({ ...form, domain: val ?? '' })}>
+                  <SelectTrigger className="h-11 w-full rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4">
+                    <SelectValue placeholder="Select domain..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {domains.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+              Description *
+            </label>
+            <textarea
+              placeholder="Describe the task instructions, requirements, and deliverables..."
               required
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="h-11 rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4"
-            />
-            <Input
-              placeholder="Domain"
-              required
-              value={form.domain}
-              onChange={(e) => setForm({ ...form, domain: e.target.value })}
-              className="h-11 rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="min-h-20 sm:min-h-24 w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 text-sm outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
             />
           </div>
 
-          <textarea
-            placeholder="Task description"
-            required
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            className="min-h-28 w-full rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 text-sm outline-none transition placeholder:text-[#94A3B8] focus:border-[#0F3F7F] focus:bg-white"
-          />
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                Assign To *
+              </label>
+              <Select
+                value={form.assigneeEmail}
+                onValueChange={(value) => setForm({ ...form, assigneeEmail: value ?? '' })}
+              >
+                <SelectTrigger className="h-11 w-full rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4">
+                  <SelectValue placeholder="Select volunteer...">
+                    {selectedAssignee ? selectedAssignee.full_name : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {volunteerAssignees.map((assignee) => (
+                    <SelectItem key={assignee.email} value={assignee.email}>
+                      {assignee.full_name || 'Unnamed Volunteer'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Select
-              value={form.assigneeEmail}
-              onValueChange={(value) => setForm({ ...form, assigneeEmail: value ?? assignees[0]?.email ?? '' })}
-            >
-              <SelectTrigger className="h-11 w-full rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4">
-                <SelectValue placeholder="Assign to" />
-              </SelectTrigger>
-              <SelectContent>
-                {assignees.map((assignee) => (
-                  <SelectItem key={assignee.email} value={assignee.email}>
-                    {assignee.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                Priority *
+              </label>
+              <Select
+                value={form.priority}
+                onValueChange={(value) => setForm({ ...form, priority: value as TaskPriority })}
+              >
+                <SelectTrigger className="h-11 w-full rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4">
+                  <SelectValue placeholder="Select priority..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {priorityOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={form.priority} onValueChange={(value) => setForm({ ...form, priority: value as TaskPriority })}>
-              <SelectTrigger className="h-11 w-full rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                {priorityOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="date"
-              required
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-              className="h-11 rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4"
-            />
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                Due Date *
+              </label>
+              <Input
+                type="date"
+                required
+                value={form.dueDate}
+                onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+                className="h-11 rounded-xl border-[#D8E0EA] bg-[#F5F7FA] px-4"
+              />
+            </div>
           </div>
 
-          <label className="block text-sm font-medium text-[#101828]">
-            <span className="mb-2 block text-[#64748B]">Attachment upload (max 20MB)</span>
-            <input
-              type="file"
-              onChange={handleFileChange}
-              className="block w-full cursor-pointer rounded-xl border border-[#D8E0EA] bg-[#F5F7FA] px-4 py-3 text-sm text-[#64748B] file:mr-4 file:rounded-lg file:border-0 file:bg-[#0F3F7F] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
-            />
-            <span className="mt-2 block text-xs text-[#64748B]">File will be uploaded directly to Supabase Storage bucket &apos;task-attachments&apos;.</span>
-          </label>
+          <div className="rounded-xl border border-[#D8E0EA] bg-[#F8FAFC] p-4 space-y-3">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                Supporting Files (Images, PDF, Excel, Word — Max 20MB)
+              </label>
+              <input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip"
+                onChange={handleFileChange}
+                className="block w-full cursor-pointer rounded-xl border border-[#D8E0EA] bg-white px-4 py-2 text-xs text-[#64748B] file:mr-4 file:rounded-lg file:border-0 file:bg-[#0F3F7F] file:px-3 file:py-1 file:text-xs file:font-semibold file:text-white"
+              />
+              {selectedFile && (
+                <p className="mt-1 text-xs font-medium text-[#0F3F7F]">
+                  Selected file: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+                </p>
+              )}
+            </div>
 
-          {selectedFile && (
-            <p className="text-sm text-[#0F3F7F]">Selected file: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)</p>
-          )}
+            <div className="pt-2 border-t border-[#E2E8F0] space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#64748B]">
+                  Video / Reel Link (Google Drive or YouTube)
+                </label>
+                <span className="text-[10px] text-[#0F3F7F] font-semibold bg-[#EAF1FF] px-2 py-0.5 rounded-full">
+                  Hybrid Storage
+                </span>
+              </div>
+              <p className="text-[11px] text-[#94A3B8]">
+                To conserve storage, paste a Google Drive share link or unlisted YouTube link instead of uploading large video files.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Input
+                  type="url"
+                  placeholder="https://drive.google.com/... or https://youtube.com/..."
+                  value={videoLink}
+                  onChange={(e) => setVideoLink(e.target.value)}
+                  className="h-10 rounded-xl border-[#D8E0EA] bg-white text-xs"
+                />
+                <Input
+                  type="text"
+                  placeholder="Link Label (e.g. Campaign Reel Draft)"
+                  value={videoLabel}
+                  onChange={(e) => setVideoLabel(e.target.value)}
+                  className="h-10 rounded-xl border-[#D8E0EA] bg-white text-xs"
+                />
+              </div>
+            </div>
+          </div>
 
-          {error && <p className="text-sm text-[#DC2626]">{error}</p>}
+          {error && <p className="text-sm font-semibold text-[#DC2626]">{error}</p>}
 
           <DialogFooter className="px-0 pb-0 pt-2">
             <Button
               type="submit"
               disabled={loading}
-              className="h-11 rounded-xl bg-[#FFC107] px-5 text-[#0F3F7F] hover:bg-[#ffcb2f]"
+              className="h-11 w-full sm:w-auto rounded-xl bg-[#FFC107] px-6 text-sm font-semibold text-[#0F3F7F] hover:bg-[#ffcb2f]"
             >
               {loading ? 'Creating task...' : 'Create task'}
             </Button>

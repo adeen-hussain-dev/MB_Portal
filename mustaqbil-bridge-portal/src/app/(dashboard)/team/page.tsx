@@ -1,11 +1,27 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AddVolunteerDialog } from '@/components/team/add-volunteer-dialog'
 import { fetchTasks } from '@/lib/portal-data'
 
 export default async function TeamPage() {
   const supabase = await createClient()
-  const [{ data: { user } }, profilesResult, tasks] = await Promise.all([
-    supabase.auth.getUser(),
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: currentProfile } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, role')
+    .eq('id', user.id)
+    .single()
+
+  if (!currentProfile || !['admin', 'manager'].includes(currentProfile.role ?? '')) {
+    redirect('/tasks')
+  }
+
+  const [profilesResult, tasks] = await Promise.all([
     supabase.from('profiles').select('*').order('created_at'),
     fetchTasks(),
   ])
@@ -15,7 +31,6 @@ export default async function TeamPage() {
   }
 
   const profiles = profilesResult.data ?? []
-  const currentProfile = profiles.find((p) => p.id === user?.id)
   const isAdmin = currentProfile?.role === 'admin'
 
   const openTasksByEmail = tasks.reduce<Record<string, number>>((accumulator, task) => {

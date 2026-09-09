@@ -72,7 +72,7 @@ export default function AuthCallback() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F5F7FA] px-6 py-12 text-[#101828]">
         <div className="w-full max-w-md rounded-[2rem] border border-[#D8E0EA] bg-white p-8 text-center shadow-[0_28px_80px_-48px_rgba(15,63,127,0.42)]">
-          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={62} className="mx-auto" style={lightLogoStyle} priority />
+          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={176} height={22} className="mx-auto" style={lightLogoStyle} priority />
           <h1 className="mt-8 font-heading text-2xl font-semibold">Verifying invite</h1>
           <p className="mt-3 text-sm leading-6 text-[#64748B]">Please wait while we confirm your invite and prepare your account.</p>
         </div>

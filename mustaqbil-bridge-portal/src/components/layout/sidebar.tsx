@@ -2,16 +2,18 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { MenuIcon, XIcon } from 'lucide-react';
+import { LogOutIcon, MenuIcon, XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { createClient } from '@/lib/supabase/client';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 
 const links = [
   { href: '/', label: 'Overview' },
   { href: '/tasks', label: 'Tasks' },
-  { href: '/team', label: 'Team' },
+  { href: '/team', label: 'Team', adminOrManagerOnly: true },
 ];
 
 function isActivePath(pathname: string, href: string) {
@@ -21,11 +23,92 @@ function isActivePath(pathname: string, href: string) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<{
+    full_name?: string | null;
+    email?: string | null;
+    role?: string | null;
+    avatar_url?: string | null;
+  } | null>(null);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase
+          .from('profiles')
+          .select('full_name, email, role, avatar_url')
+          .eq('id', user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              setUserProfile(data);
+            } else {
+              setUserProfile({ email: user.email ?? '' });
+            }
+          });
+      }
+    });
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
+
+  const isVolunteer = userProfile?.role === 'volunteer';
+  const visibleLinks = links.filter((link) => {
+    if (link.adminOrManagerOnly && isVolunteer) {
+      return false;
+    }
+    return true;
+  });
+
+  function renderProfileCard() {
+    const displayName = userProfile?.full_name || userProfile?.email || 'Logged User';
+    const initial = displayName.charAt(0).toUpperCase();
+    const roleText = userProfile?.role || 'Volunteer';
+
+    return (
+      <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-3.5">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/profile"
+            className="group flex min-w-0 flex-1 items-center gap-3 transition hover:opacity-85"
+            title="View & edit your profile"
+          >
+            <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FFC107] font-bold text-[#0F3F7F] text-xs shadow-inner transition group-hover:ring-2 group-hover:ring-white/40">
+              {userProfile?.avatar_url ? (
+                <img src={userProfile.avatar_url} alt={displayName} className="size-9 object-cover" />
+              ) : (
+                <span>{initial}</span>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white group-hover:text-[#FFC107] transition-colors">{displayName}</p>
+              <p className="truncate text-[10px] capitalize tracking-wider text-white/60">{roleText}</p>
+            </div>
+          </Link>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            title="Sign out"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white/80 transition hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-300"
+          >
+            <LogOutIcon className="size-4" />
+            <span className="sr-only">Sign out</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -33,16 +116,19 @@ export function Sidebar() {
         <Link href="/" className="inline-flex items-center">
           <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={128} height={42} />
         </Link>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="border border-white/15 bg-white/10 text-white hover:bg-white/15"
-          onClick={() => setMobileOpen(true)}
-        >
-          <MenuIcon />
-          <span className="sr-only">Open navigation</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <NotificationBell theme="dark" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="border border-white/15 bg-white/10 text-white hover:bg-white/15"
+            onClick={() => setMobileOpen(true)}
+          >
+            <MenuIcon />
+            <span className="sr-only">Open navigation</span>
+          </Button>
+        </div>
       </div>
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 shrink-0 flex-col border-r border-white/10 bg-[#0F3F7F] px-6 py-6 text-white lg:flex">
@@ -58,7 +144,7 @@ export function Sidebar() {
         </div>
 
         <nav className="mt-8 space-y-2">
-          {links.map((link) => {
+          {visibleLinks.map((link) => {
             const active = isActivePath(pathname, link.href);
 
             return (
@@ -77,14 +163,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-          <p className="text-xs uppercase tracking-[0.24em] text-white/60">Brand palette</p>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-[#FFC107]" />
-            <span className="h-3 w-3 rounded-full bg-white" />
-            <span className="h-3 w-3 rounded-full bg-[#0F3F7F] ring-1 ring-white/30" />
-          </div>
-        </div>
+        {renderProfileCard()}
       </aside>
 
       <Dialog open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -113,7 +192,7 @@ export function Sidebar() {
             </div>
 
             <nav className="mt-6 space-y-2">
-              {links.map((link) => {
+              {visibleLinks.map((link) => {
                 const active = isActivePath(pathname, link.href);
 
                 return (
@@ -132,14 +211,7 @@ export function Sidebar() {
               })}
             </nav>
 
-            <div className="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-white/60">Brand palette</p>
-              <div className="mt-3 flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-[#FFC107]" />
-                <span className="h-3 w-3 rounded-full bg-white" />
-                <span className="h-3 w-3 rounded-full bg-[#0F3F7F] ring-1 ring-white/30" />
-              </div>
-            </div>
+            {renderProfileCard()}
           </div>
         </DialogContent>
       </Dialog>
