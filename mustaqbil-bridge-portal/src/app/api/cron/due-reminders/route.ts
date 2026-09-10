@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendDueTomorrowEmail } from '@/lib/email'
+import { recordMonthlyWinnerSnapshot } from '@/lib/monthly-winners'
 
 /**
  * Helper to get a calendar date formatted as YYYY-MM-DD in Pakistan Standard Time (PKT / Asia/Karachi).
@@ -28,7 +29,12 @@ export async function GET(request: Request) {
   const todayPkt = getPktDateString(now)
   const tomorrowPkt = getPktDateString(new Date(now.getTime() + 24 * 60 * 60 * 1000))
 
-  console.log(`[Cron: Due Reminders] Running at UTC: ${now.toISOString()} | PKT Today: ${todayPkt} | Looking for tasks due PKT Tomorrow: ${tomorrowPkt}`)
+  // Allow test date override when authenticated with CRON_SECRET
+  const url = new URL(request.url)
+  const testTodayPkt = url.searchParams.get('testTodayPkt')
+  const effectiveTodayPkt = testTodayPkt || todayPkt
+
+  console.log(`[Cron: Due Reminders] Running at UTC: ${now.toISOString()} | PKT Today: ${effectiveTodayPkt} (real: ${todayPkt}) | Looking for tasks due PKT Tomorrow: ${tomorrowPkt}`)
 
   const admin = createAdminClient()
 
@@ -163,13 +169,23 @@ export async function GET(request: Request) {
     }
   }
 
+  // 6. Monthly Winner Snapshot: if effectiveTodayPkt is the 1st of the month, snapshot previous month
+  let monthlyWinnerSnapshot = null
+  try {
+    monthlyWinnerSnapshot = await recordMonthlyWinnerSnapshot({ todayPktDate: effectiveTodayPkt })
+  } catch (snapErr) {
+    console.warn('[Cron: Due Reminders] Monthly winner snapshot error (non-fatal):', snapErr)
+  }
+
   return NextResponse.json({
     success: true,
     timezone: 'Asia/Karachi (PKT, UTC+5)',
-    todayPkt,
+    todayPkt: effectiveTodayPkt,
+    realTodayPkt: todayPkt,
     tomorrowPkt,
     remindedCount: results.filter((r) => r.success).length,
     totalFound: tasksToRemind.length,
+    monthlyWinnerSnapshot,
     results,
   })
 }

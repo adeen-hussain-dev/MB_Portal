@@ -125,6 +125,7 @@ export function NotificationBell({ theme = 'light' }: NotificationBellProps) {
   }
 
   useEffect(() => {
+    let isMounted = true
     loadNotifications()
 
     // 2. Realtime listener on notifications table
@@ -132,10 +133,12 @@ export function NotificationBell({ theme = 'light' }: NotificationBellProps) {
     let channel: any = null
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user || !isMounted) return
 
+      // Use a unique channel suffix to prevent topic collision across desktop/mobile mounts
+      const channelTopic = `user-notifications-${user.id}-${Math.random().toString(36).slice(2, 9)}`
       channel = supabase
-        .channel(`user-notifications-${user.id}`)
+        .channel(channelTopic)
         .on(
           'postgres_changes',
           {
@@ -145,6 +148,7 @@ export function NotificationBell({ theme = 'light' }: NotificationBellProps) {
             filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
+            if (!isMounted) return
             const newRow = payload.new as any
             if (!newRow) return
             const newItem: NotificationItem = {
@@ -168,11 +172,16 @@ export function NotificationBell({ theme = 'light' }: NotificationBellProps) {
     })
 
     // Fallback periodic poll every 30s
-    const interval = setInterval(loadNotifications, 30000)
+    const interval = setInterval(() => {
+      if (isMounted) loadNotifications()
+    }, 30000)
 
     return () => {
+      isMounted = false
       clearInterval(interval)
-      if (channel) supabase.removeChannel(channel)
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
     }
   }, [])
 

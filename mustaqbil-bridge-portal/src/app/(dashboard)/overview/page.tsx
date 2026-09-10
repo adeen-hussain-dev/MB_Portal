@@ -12,9 +12,10 @@ import {
   ArrowRightIcon,
   RotateCcwIcon,
   UserCheckIcon,
+  AwardIcon,
 } from 'lucide-react'
 
-export default async function DashboardPage() {
+export default async function OverviewPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -23,10 +24,10 @@ export default async function DashboardPage() {
   }
 
   const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, full_name, email, role')
-    .eq('id', user.id)
-    .single()
+  .from('profiles')
+  .select('id, full_name, email, role')
+  .eq('id', user.id)
+  .single()
 
   const userRole = profile?.role || 'volunteer'
   const isVolunteer = userRole === 'volunteer'
@@ -316,6 +317,60 @@ export default async function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Historical Monthly Winners Section */}
+      <div className="rounded-[2rem] border border-[#D8E0EA] bg-white p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AwardIcon className="size-5 text-[#0F3F7F]" />
+            <h2 className="font-heading text-lg font-semibold text-[#101828]">
+              Past Winners
+            </h2>
+          </div>
+          <span className="text-[11px] text-[#64748B] font-medium">Historical Snapshots</span>
+        </div>
+
+        {(!adminData.pastWinners || adminData.pastWinners.length === 0) ? (
+          <div className="rounded-xl border border-dashed border-[#D8E0EA] p-6 text-center text-xs text-[#64748B]">
+            No historical month-end snapshots recorded yet. The snapshot is created automatically on the 1st of each month.
+          </div>
+        ) : (
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {adminData.pastWinners.map((winner) => (
+              <div
+                key={winner.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-[#D8E0EA] bg-[#F8FAFC] p-4 transition hover:border-[#0F3F7F]/40"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-[#D97706] border border-amber-200">
+                    <TrophyIcon className="size-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[#0F3F7F]">
+                      {winner.formattedMonth}
+                    </p>
+                    <p className="truncate text-sm font-semibold text-[#101828]">
+                      {winner.volunteerName}
+                    </p>
+                    <p className="text-[10px] text-[#64748B] truncate">
+                      {winner.completedCount} completed &bull; {winner.onTimeCount} on-time{winner.avgRating ? ` • ★ ${winner.avgRating}/10` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="font-heading text-lg font-bold text-[#0F3F7F]">
+                    {winner.score}
+                  </span>
+                  <span className="block text-[10px] uppercase font-bold text-[#64748B]">
+                    pts
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )

@@ -29,14 +29,16 @@ export async function proxy(request: NextRequest) {
     const { data } = await supabase.auth.getSession()
     user = data.session?.user ?? null
   }
-  const isPublicPath = request.nextUrl.pathname.startsWith('/login')
+  const isPublicPath = request.nextUrl.pathname === '/'
+    || request.nextUrl.pathname.startsWith('/login')
     || request.nextUrl.pathname.startsWith('/auth/callback')
     || request.nextUrl.pathname.startsWith('/api')
+    || /\.(svg|png|jpg|jpeg|gif|webp|ico)$/i.test(request.nextUrl.pathname)
 
   if (!user && !isPublicPath) {
     const loginUrl = new URL('/login', request.url)
     const redirectTo = request.nextUrl.pathname + request.nextUrl.search
-    if (redirectTo && redirectTo !== '/') {
+    if (redirectTo && redirectTo !== '/' && redirectTo !== '/overview') {
       loginUrl.searchParams.set('redirectTo', redirectTo)
     }
     return NextResponse.redirect(loginUrl)
@@ -44,15 +46,15 @@ export async function proxy(request: NextRequest) {
 
   if (user && request.nextUrl.pathname.startsWith('/login')) {
     const redirectTo = request.nextUrl.searchParams.get('redirectTo')
-    if (redirectTo && redirectTo.startsWith('/')) {
+    if (redirectTo && redirectTo.startsWith('/') && redirectTo !== '/') {
       return NextResponse.redirect(new URL(redirectTo, request.url))
     }
-    return NextResponse.redirect(new URL('/tasks', request.url))
+    return NextResponse.redirect(new URL('/overview', request.url))
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

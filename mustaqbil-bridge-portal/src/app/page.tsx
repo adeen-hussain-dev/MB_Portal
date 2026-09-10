@@ -1,5 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
 
 const stages = [
   { label: 'To do', note: 'Queued' },
@@ -8,13 +10,16 @@ const stages = [
   { label: 'Done', note: 'Approved' },
 ];
 
-const lightLogoStyle = {
-  filter: 'brightness(0) saturate(100%) invert(15%) sepia(66%) saturate(1848%) hue-rotate(192deg) brightness(92%) contrast(101%)',
-  width: 'auto',
-  // height: 'auto',
-};
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function Home() {
+  if (user) {
+    redirect('/overview');
+  }
+
   return (
     <main
       className="min-h-screen text-[#101828]"
@@ -25,7 +30,16 @@ export default function Home() {
     >
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-6 lg:px-10">
         <header className="flex items-center justify-between gap-4">
-          <Image src="/MB_Logo.svg" alt="Mustaqbil Bridge" width={200} height={54} style={lightLogoStyle} priority />
+          <Link href="/" className="inline-flex items-center">
+            <Image
+              src="/MB_Logo.svg"
+              alt="Mustaqbil Bridge"
+              width={160}
+              height={48}
+              className="h-9 w-auto"
+              priority
+            />
+          </Link>
           <Link
             href="/login"
             className="inline-flex items-center justify-center rounded-full bg-[#FFC107] px-5 py-2.5 text-sm font-semibold text-[#0F3F7F] shadow-[0_10px_30px_-16px_rgba(15,63,127,0.5)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_-18px_rgba(15,63,127,0.55)]"

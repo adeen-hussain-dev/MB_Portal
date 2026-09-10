@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
 import { mapTaskRow, type TaskInput, type TaskRecord, type TaskRow, type TaskComment, type TaskStatus, type TaskPriority, type TaskAttachmentDetail, type TaskQuestion } from '@/lib/task-store'
+import { fetchPastWinners, type PastWinner } from '@/lib/monthly-winners'
 
 export type ProfileRecord = {
   id: string
@@ -66,6 +67,7 @@ export type AdminOverviewData = {
   totalVolunteers: number
   leaderboard: VolunteerScore[]
   completedPerVolunteer: Array<{ name: string; completed: number }>
+  pastWinners: PastWinner[]
 }
 
 export async function fetchTasks() {
@@ -549,12 +551,15 @@ export async function fetchAdminOverview(): Promise<AdminOverviewData> {
     completed: v.completed,
   }))
 
+  const pastWinners = await fetchPastWinners()
+
   return {
     statusCounts,
     totalTasks: tasksList.length,
     totalVolunteers: volunteerList.length,
     leaderboard,
     completedPerVolunteer,
+    pastWinners,
   }
 }
 

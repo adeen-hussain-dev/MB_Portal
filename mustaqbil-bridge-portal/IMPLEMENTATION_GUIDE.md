@@ -128,13 +128,15 @@ Centered card on a Mist background. Logo above the form. Amber submit button. No
 7. **Kanban board** — drag-and-drop, drag-to-approve removed, Review modal, responsive layout
 8. **Approval flow** — `changes_requested`, `approved_by`/`approved_at`, rejection reason saved as a comment
 9. **Questions** (`task_questions`) — volunteer asks on a task, routed to manager/admin, answer flow with live `answeredByName` and RLS enforcement
+10. **Notifications (in-app)** — bell icon, unread count badge, interactive dropdown list, mark-as-read, realtime sync (RLS-enforced, server-only inserts). Verified: both Admin & Manager notified on `in_review` submissions. Note: requires `alter publication supabase_realtime add table notifications;` run in Supabase SQL Editor to enable instant WebSocket push; otherwise safely falls back to 30s polling.
 11a/b. **Email — task assigned & due-tomorrow reminder** — confirmed via real inbox + real cron auth checks, with same-day dedup via `activity_log`
 11c/d. **Email — question raised & question answered** — branded Nodemailer emails dispatched on question ask and answer, verified via real Gmail IMAP
 12. **Profile page** — avatar upload and password change verified with real accounts
 12A/B/C. **Section 12 Requirements** — late-submission reason, hybrid attachments (files & external links), satisfaction rating (1-10) with updated leaderboard formula
+13. **Admin/Manager dashboard & Monthly Winners Snapshot** — role-split overview, `recharts` completed tasks chart, formula-scored leaderboard (`(completed*10) + (on_time*5) - (rejections*5) + (avg_rating*3)`), `monthly_winners` table populated automatically on the 1st of each month via PKT cron, duplicate-safe unique(month) constraint, and "Past Winners" dashboard list.
 
-### ⬜ Not started / Next up
-10. **Notifications (in-app)** — bell icon, unread count badge, interactive dropdown list, mark-as-read, realtime sync
+### ⬜ Next up / Remaining (Final Module)
+14. **Polish & Deploy** — landing page signature animated bridge line, Vercel Hobby deployment check
 
 ### ✅ Exists (built ahead of planned order)
 14. **Landing page** — live, branded; the signature animated "bridge line" is still pending as polish, not urgent

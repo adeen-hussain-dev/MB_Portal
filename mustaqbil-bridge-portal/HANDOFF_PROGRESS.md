@@ -298,3 +298,89 @@ This section is critical for handoff continuity.
 - **Test 4**: `GET /api/tasks/:id` returns questions array with complete author and answer metadata.
 - **Test 5**: Cleaned up all test data. Verified `tasks count = 0, task_questions count = 0`.
 
+---
+
+## 8. Verification Record: Module 10 (In-App Notifications - Bell) — VERIFIED
+
+### Schema & Security (Server-Only Inserts)
+- Table: `notifications` (`id`, `user_id`, `type`, `title`, `body`, `task_id`, `is_read`, `created_at`).
+- Index: `idx_notifications_user_unread` on `(user_id, is_read, created_at desc)`.
+- RLS:
+  - `notifications_select_policy`: `using (user_id = auth.uid())`
+  - `notifications_update_policy`: `using (user_id = auth.uid()) with check (user_id = auth.uid())`
+  - **No insert policy for authenticated**: client-side direct inserts are strictly forbidden (returns HTTP 403 / 42501).
+  - All inserts execute server-side via `createNotification()` / `createNotifications()` using the service-role admin client.
+
+### Event Dispatch Wiring Across All Four Points
+1. **Task Assigned**: `POST /api/tasks` and reassignment in `PATCH /api/tasks/[id]` dispatch `task_assigned` notification to volunteer.
+2. **Question Asked**: `POST /api/questions` dispatches `question_asked` notifications to all admins & managers.
+3. **Question Answered**: `PATCH /api/questions/[id]/answer` dispatches `question_answered` notification to the volunteer who asked.
+4. **Status Transitions**:
+   - `in_review`: dispatches `task_status` notification to admins & managers.
+   - `changes_requested`: dispatches `task_status` notification to volunteer with required change reason.
+   - `done`: dispatches `task_status` notification to volunteer with satisfaction rating.
+
+### UI & API Features
+- **API Routes**:
+  - `GET /api/notifications`: Returns user's notifications (newest first, limit 30) and exact `unreadCount`.
+  - `PATCH /api/notifications`: Marks single notification (`{ id }`) or all notifications (`{ markAllRead: true }`) as read.
+- **NotificationBell Component** (`src/components/notifications/notification-bell.tsx`):
+  - Signal Amber unread badge counter (`9+` for large numbers).
+  - Popover dropdown panel with customized icons per type (`task_assigned`, `task_status`, `question_asked`, `question_answered`, `system`).
+  - Clicking notification marks it as read and redirects straight to `/tasks/[id]`.
+  - Individual "mark read" button and "Mark all read" header action.
+  - Hybrid synchronization: Supabase Realtime subscription (`postgres_changes` on `notifications` table) + 30-second background polling fallback.
+- **Header Placement**:
+  - Desktop: Embedded in sticky `TopHeader` (`src/components/layout/top-header.tsx`) with user profile quick-chip.
+  - Mobile: Embedded in the mobile navigation bar in `Sidebar` next to the menu toggle.
+
+### Live End-to-End Verification (`scratch/verify_module10_e2e.mjs`)
+- **Check 1 (Spoofed Insert)**: Authenticated volunteer directly calling `POST /rest/v1/notifications` rejected with HTTP 403 / `42501: new row violates row-level security policy`.
+- **Check 2 (4 Event Triggers)**:
+  - Task Assigned: Row confirmed in DB for Volunteer A.
+  - Question Asked: Row confirmed in DB for Admin.
+  - Question Answered: Row confirmed in DB for Volunteer A.
+  - Status transitions (`in_review`, `changes_requested`, `done`): All 3 rows confirmed in DB for correct recipients.
+- **Check 3 (Bell API & Role Isolation)**:
+  - Volunteer A receives 4 notifications, unread count = 4, 0 foreign rows.
+  - Admin receives 2 notifications, unread count = 2, 0 foreign rows.
+  - Marking single notification read -> updates `is_read = true`, unread count decrements to 3.
+  - Marking all read -> updates all to `is_read = true`, unread count decrements to 0.
+- **Check 4 (Zero Leftovers)**: Database verified at `tasks = 0, task_questions = 0, notifications = 0`.
+### Additional Confirmations & Live Test Runs
+- **Realtime Replication Publication**:
+  - Live WebSocket test executed against Supabase Realtime endpoint: client successfully connected and subscribed to `postgres_changes`.
+  - When `notifications` row is inserted, no CDC event is received because new Supabase tables are not added to `supabase_realtime` by default until `alter publication supabase_realtime add table notifications;` is executed in Supabase SQL Editor.
+  - Until that publication SQL is executed, the bell updates automatically via the 30-second polling fallback (and on-demand whenever the bell popover is opened).
+- **In-Review Multi-Role Notification**:
+  - Verified live: when a volunteer submits a task for `in_review`, the API queries `.in('role', ['admin', 'manager'])` and creates notifications for BOTH Admin and Manager accounts.
+  - Real test output confirmed Admin received `Task In Review` notification (`id: 133d35ab-6837-4ed0-ad4b-7078e542d039`) and Manager received `Task In Review` notification (`id: a04c1529-a254-4186-bb62-76d52c317217`).
+- **Zero Leftovers**: Cleaned up all test tasks and notifications (total = 0).
+
+---
+
+## 9. Verification Record: Module 13 & Monthly Winners Snapshot — VERIFIED
+
+### Schema & Security (`monthly_winners`)
+- Table: `monthly_winners` (`id`, `month`, `volunteer_id`, `score`, `completed_count`, `on_time_count`, `rejected_count`, `avg_rating`, `created_at`).
+- Unique Constraint: `unique(month)`.
+- RLS:
+  - `monthly_winners_select_policy`: `using (get_my_role() in ('admin', 'manager'))`.
+  - No insert policy for authenticated (server/cron only via admin client).
+
+### Automated Snapshot Logic & Integration
+- Implemented in `src/lib/monthly-winners.ts` (`recordMonthlyWinnerSnapshot` and `fetchPastWinners`).
+- Wired into `src/app/api/cron/due-reminders/route.ts` reusing the daily PKT cron execution.
+- If `todayPkt` is the 1st of the month, computes previous month's score:
+  `score = (completed * 10) + (on_time * 5) - (rejections * 5) + (avg_rating * 3)`.
+- Inserts top volunteer for that month.
+- Idempotent: `unique(month)` duplicate violations are caught and handled silently (`skippedDuplicate: true`).
+- UI: "Past Winners" card added to Admin/Manager dashboard (`src/app/(dashboard)/page.tsx`) rendering historical monthly snapshots.
+
+### Live End-to-End Verification (`scratch/test_monthly_winners_e2e.mjs`)
+- **Score Calculation**: Seeded August 2026 task (`completed=1`, `on_time=1`, `rejections=0`). Snapshot computed top volunteer with exact score = 15 pts.
+- **Database Row**: Verified row inserted into `monthly_winners` with `month = '2026-08-01'`.
+- **Idempotency**: Re-ran snapshot for same month -> returned `skippedDuplicate: true` with HTTP 200 without throwing errors.
+- **Past Winners Query**: Verified query loaded August 2026 winner with name and score for dashboard display.
+- **Real Cron Execution**: Called `/api/cron/due-reminders` on real non-1st date (`2026-09-09`) -> confirmed snapshot skipped (`ran: false`).
+- **Zero Leftovers**: Cleaned up test task and winner row. Confirmed 0 leftovers in database.
