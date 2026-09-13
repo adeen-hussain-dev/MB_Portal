@@ -124,19 +124,18 @@ Centered card on a Mist background. Logo above the form. Amber submit button. No
 3. **Auth** — invite-only signup, Gmail SMTP, login, `/auth/callback`, `proxy.ts` route protection
 4. **Team directory** — RLS-verified with real throwaway accounts
 5. **Task creation + assignment** — including real file attachments (RLS-verified)
-6. **Comment composer** — verified with real comments posted by manager and volunteer
+6. **Task list + detail view + comments** — comment posting confirmed with real inserts and role-mapped rendering
 7. **Kanban board** — drag-and-drop, drag-to-approve removed, Review modal, responsive layout
 8. **Approval flow** — `changes_requested`, `approved_by`/`approved_at`, rejection reason saved as a comment
-9. **Questions** (`task_questions`) — volunteer asks on a task, routed to manager/admin, answer flow with live `answeredByName` and RLS enforcement
-10. **Notifications (in-app)** — bell icon, unread count badge, interactive dropdown list, mark-as-read, realtime sync (RLS-enforced, server-only inserts). Verified: both Admin & Manager notified on `in_review` submissions. Note: requires `alter publication supabase_realtime add table notifications;` run in Supabase SQL Editor to enable instant WebSocket push; otherwise safely falls back to 30s polling.
-11a/b. **Email — task assigned & due-tomorrow reminder** — confirmed via real inbox + real cron auth checks, with same-day dedup via `activity_log`
-11c/d. **Email — question raised & question answered** — branded Nodemailer emails dispatched on question ask and answer, verified via real Gmail IMAP
-12. **Profile page** — avatar upload and password change verified with real accounts
-12A/B/C. **Section 12 Requirements** — late-submission reason, hybrid attachments (files & external links), satisfaction rating (1-10) with updated leaderboard formula
-13. **Admin/Manager dashboard & Monthly Winners Snapshot** — role-split overview, `recharts` completed tasks chart, formula-scored leaderboard (`(completed*10) + (on_time*5) - (rejections*5) + (avg_rating*3)`), `monthly_winners` table populated automatically on the 1st of each month via PKT cron, duplicate-safe unique(month) constraint, and "Past Winners" dashboard list.
+11a/b. **Email — task assigned & due-tomorrow reminder** — both confirmed via real inbox + real cron auth checks, with same-day dedup via `activity_log`
+12. **Profile page** — avatar upload and password change manually confirmed by you
+13. **Admin/Manager dashboard** — role-split overview, chart, and leaderboard manually confirmed by you
+12A/B/C. **Late-submission reason, hybrid attachments, satisfaction rating** — all three confirmed with real HTTP status codes and DB rows
 
-### ⬜ Next up / Remaining (Final Module)
-14. **Polish & Deploy** — landing page signature animated bridge line, Vercel Hobby deployment check
+### ⬜ Not started
+9. **Questions** (`task_questions`) — volunteer asks on a task, routed to manager/admin, answer flow
+10. **Notifications (in-app)** — bell icon, unread count, list, mark-as-read
+11c/d. **Email — question raised & question answered** — will be built alongside Module 9 now, since they depend on it directly
 
 ### ✅ Exists (built ahead of planned order)
 14. **Landing page** — live, branded; the signature animated "bridge line" is still pending as polish, not urgent
@@ -211,6 +210,18 @@ When a volunteer moves a task to `in_review` and `due_date` (in PKT) has already
 
 ---
 
-## 13. What changes if a future instruction changes DB or file structure
+### D. Mandatory submission attachment (new column + volunteer upload UI)
+Volunteers currently have no way to attach their completed work — only admin/manager-uploaded reference files exist, and nothing distinguishes a reference file from a volunteer's actual submission.
+
+- **Schema change**:
+  ```sql
+  alter table task_attachments
+    add column if not exists purpose text not null default 'reference'
+    check (purpose in ('reference', 'submission'));
+  ```
+  Files admin/manager attach at task creation → `purpose = 'reference'`. Files/links a volunteer attaches when submitting → `purpose = 'submission'`.
+- Task detail page shows two clearly labeled, separate sections: **"Reference Materials"** (reference) and **"Submitted Work"** (submission) — never mixed in one list.
+- **Confirmed: mandatory for every task.** A volunteer cannot move a task to `in_review` without attaching at least one submission item (file upload via the existing hybrid approach — direct upload for images/Excel/docs, pasted link for video — see §12B). Enforce server-side, same standard as the late-submission reason: the PATCH to `in_review` is rejected if no submission attachment (of either type) exists for that task.
+- **Interacts with §12A (late-submission reason)**: if due_date has passed, both the late reason text AND the submission attachment are required together in the same action — not sequential separate steps.
 
 Going forward, any new requirement that touches the database or the file layout will be called out **separately, right under the requirement**, the same way §5 and §12 do above — not buried in general text — so you always know exactly what to run in Supabase or where to create a file before moving on.

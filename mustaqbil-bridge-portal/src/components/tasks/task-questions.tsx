@@ -21,6 +21,7 @@ type TaskQuestionsProps = {
   userRole: string
   currentUserId?: string | null
   isAssignee: boolean
+  taskStatus?: string
 }
 
 export function TaskQuestions({
@@ -28,6 +29,7 @@ export function TaskQuestions({
   initialQuestions,
   userRole,
   isAssignee,
+  taskStatus,
 }: TaskQuestionsProps) {
   const router = useRouter()
   const [questions, setQuestions] = useState<TaskQuestion[]>(initialQuestions)
@@ -43,7 +45,7 @@ export function TaskQuestions({
   const [answerError, setAnswerError] = useState<string | null>(null)
 
   const isAdminOrManager = ['admin', 'manager'].includes(userRole)
-  const canAskQuestion = isAssignee || (userRole === 'volunteer' && isAssignee)
+  const canAskQuestion = taskStatus !== 'done' && (isAssignee || (userRole === 'volunteer' && isAssignee))
 
   async function handlePostQuestion(e: React.FormEvent) {
     e.preventDefault()

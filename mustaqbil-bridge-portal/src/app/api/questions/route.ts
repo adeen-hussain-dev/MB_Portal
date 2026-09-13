@@ -35,12 +35,19 @@ export async function POST(request: Request) {
     // 1. Verify task existence & verify assignee matches user
     const { data: task, error: taskError } = await admin
       .from('tasks')
-      .select('id, title, assignee_id')
+      .select('id, title, assignee_id, status')
       .eq('id', taskId)
       .maybeSingle()
 
     if (taskError || !task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    if (task.status === 'done') {
+      return NextResponse.json(
+        { error: 'Cannot ask questions on a completed task' },
+        { status: 400 }
+      )
     }
 
     if (task.assignee_id !== user.id) {

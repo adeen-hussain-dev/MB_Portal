@@ -5,7 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const authHeader = request.headers.get('authorization')
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined
+    const { data: { user } } = await supabase.auth.getUser(token)
 
     if (!user) {
       return NextResponse.json({ error: 'Not logged in' }, { status: 401 })

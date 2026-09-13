@@ -15,6 +15,8 @@ export type TaskAttachmentDetail = {
   fileName: string
   fileUrl: string
   attachmentType: 'file' | 'link'
+  purpose?: 'reference' | 'submission'
+  createdAt?: string
 }
 
 export type TaskQuestion = {
@@ -56,7 +58,8 @@ export type TaskAttachmentInput =
   | {
       fileName: string
       fileUrl: string
-      attachmentType: 'file' | 'link'
+      attachmentType?: 'file' | 'link'
+      purpose?: 'reference' | 'submission'
     }
 
 export type TaskInput = {
@@ -95,6 +98,8 @@ export type TaskRow = {
     file_url?: string | null
     file_name?: string | null
     attachment_type?: string | null
+    purpose?: string | null
+    created_at?: string | null
   }> | null
 }
 
@@ -113,6 +118,7 @@ export function mapTaskRow(row: TaskRow & Record<string, unknown>): TaskRecord {
       const type = (a.attachment_type === 'link' || (!a.attachment_type && (url.includes('drive.google.com') || url.includes('youtube.com') || url.includes('youtu.be'))))
         ? 'link'
         : 'file'
+      const purpose = a.purpose === 'submission' ? 'submission' : 'reference'
       if (url) {
         attachmentsList.push(url)
         attachmentDetails.push({
@@ -120,6 +126,8 @@ export function mapTaskRow(row: TaskRow & Record<string, unknown>): TaskRecord {
           fileName: name,
           fileUrl: url,
           attachmentType: type,
+          purpose,
+          createdAt: a.created_at || undefined,
         })
       }
     }

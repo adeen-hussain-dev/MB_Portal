@@ -1,0 +1,1 @@
+https://whgmuxyucbvsoxeyuswg.supabase.co/auth/v1/verify?token=c99d1512659344bdf1276e701a94339e592b928e7e1cf78765174525&type=recovery&redirect_to=http://localhost:3000

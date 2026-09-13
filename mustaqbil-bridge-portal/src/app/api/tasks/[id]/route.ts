@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { deleteTask, fetchTaskById, updateTask } from '@/lib/portal-data'
+import { addTaskAttachment, deleteTask, fetchTaskById, updateTask } from '@/lib/portal-data'
 import { sendTaskAssignedEmail } from '@/lib/email'
 import { createNotification, createNotifications } from '@/lib/notifications'
 
@@ -95,6 +95,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .eq('id', id)
     .single()
 
+  if (existingTask?.status === 'done') {
+    if (body.status !== undefined || body.assignee_id !== undefined || body.assigneeId !== undefined) {
+      return NextResponse.json(
+        { error: 'Completed tasks are in a terminal state and cannot be modified' },
+        { status: 400 }
+      )
+    }
+  }
+
   const todayPkt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Karachi',
     year: 'numeric',
@@ -104,16 +113,70 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const isLate = Boolean(existingTask?.due_date && todayPkt > existingTask.due_date)
 
-  if (body.status === 'in_review' && isLate) {
-    if (!lateReason || typeof lateReason !== 'string' || !lateReason.trim()) {
+  if (body.status === 'in_review') {
+    // If a submission attachment was provided directly in this PATCH request, insert it first
+    const subAtt = body.submission_attachment || body.submissionAttachment || body.submission
+    if (subAtt) {
+      const fileUrl = typeof subAtt === 'string' ? subAtt : (subAtt.fileUrl || subAtt.file_url)
+      const fileName = typeof subAtt === 'object' ? (subAtt.fileName || subAtt.file_name) : undefined
+      const attType = typeof subAtt === 'object' ? (subAtt.attachmentType || subAtt.attachment_type) : undefined
+      if (fileUrl) {
+        await addTaskAttachment({
+          taskId: id,
+          fileUrl,
+          fileName,
+          attachmentType: attType,
+          purpose: 'submission',
+          uploadedBy: user.id,
+        })
+      }
+    } else if (body.file_url || body.fileUrl) {
+      await addTaskAttachment({
+        taskId: id,
+        fileUrl: body.file_url || body.fileUrl,
+        fileName: body.file_name || body.fileName,
+        attachmentType: body.attachment_type || body.attachmentType,
+        purpose: 'submission',
+        uploadedBy: user.id,
+      })
+    }
+
+    // Verify that at least one submission attachment exists for this task
+    const { count: submissionCount } = await admin
+      .from('task_attachments')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_id', id)
+      .eq('purpose', 'submission')
+
+    const hasSubmission = Boolean(submissionCount && submissionCount > 0)
+    const hasLateReason = Boolean(lateReason && typeof lateReason === 'string' && lateReason.trim())
+
+    if (!hasSubmission) {
+      return NextResponse.json(
+        { error: 'At least one submission attachment is required before submitting for review' },
+        { status: 400 }
+      )
+    }
+
+    if (isLate && !hasLateReason) {
       return NextResponse.json(
         { error: 'A reason is required for late submission' },
         { status: 400 }
       )
     }
+
     delete patchData.late_reason
     delete patchData.reason
     delete patchData.comment
+    delete patchData.submission_attachment
+    delete patchData.submissionAttachment
+    delete patchData.submission
+    delete patchData.file_url
+    delete patchData.fileUrl
+    delete patchData.file_name
+    delete patchData.fileName
+    delete patchData.attachment_type
+    delete patchData.attachmentType
   }
 
   if (body.status === 'changes_requested') {
@@ -163,11 +226,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     try {
       task = await updateTask(id, patchData)
     } catch (err) {
-      // If approved_by/approved_at/satisfaction_rating columns don't exist yet in Supabase schema, fall back without them
-      if (patchData.satisfaction_rating || patchData.approved_by || patchData.approved_at) {
+      // If satisfaction_rating column doesn't exist yet in Supabase schema, retry without it
+      // but PRESERVE approved_by and approved_at so completion metrics and dates are recorded!
+      if (patchData.satisfaction_rating !== undefined) {
         delete patchData.satisfaction_rating
-        delete patchData.approved_by
-        delete patchData.approved_at
         task = await updateTask(id, patchData)
       } else {
         throw err

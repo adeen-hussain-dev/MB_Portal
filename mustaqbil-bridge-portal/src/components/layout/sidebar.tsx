@@ -11,17 +11,18 @@ import { createClient } from '@/lib/supabase/client';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 
 const links = [
-  { href: '/', label: 'Overview' },
+  { href: '/overview', label: 'Overview' },
   { href: '/tasks', label: 'Tasks' },
+  { href: '/analytics', label: 'My Analytics', volunteerOnly: true },
   { href: '/team', label: 'Team', adminOrManagerOnly: true },
 ];
 
 function isActivePath(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
+  if (href === '/overview') return pathname === '/overview';
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Sidebar() {
+export function Sidebar({ initialRole }: { initialRole?: string } = {}) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,9 +64,13 @@ export function Sidebar() {
     router.refresh();
   }
 
-  const isVolunteer = userProfile?.role === 'volunteer';
+  const currentRole = userProfile?.role ?? initialRole;
+  const isVolunteer = (currentRole ?? 'volunteer') === 'volunteer';
   const visibleLinks = links.filter((link) => {
     if (link.adminOrManagerOnly && isVolunteer) {
+      return false;
+    }
+    if ((link as { volunteerOnly?: boolean }).volunteerOnly && !isVolunteer) {
       return false;
     }
     return true;
@@ -113,7 +118,7 @@ export function Sidebar() {
   return (
     <>
       <div className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-[#0F3F7F] px-4 text-white shadow-sm lg:hidden">
-        <Link href="/" className="inline-flex items-center">
+        <Link href="/overview" className="inline-flex items-center">
           <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={128} height={42} />
         </Link>
         <div className="flex items-center gap-2">
@@ -133,7 +138,7 @@ export function Sidebar() {
 
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 shrink-0 flex-col border-r border-white/10 bg-[#0F3F7F] px-6 py-6 text-white lg:flex">
         <div className="space-y-6">
-          <Link href="/" className="inline-flex items-center">
+          <Link href="/overview" className="inline-flex items-center">
             <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={176} height={62} priority />
           </Link>
 
@@ -171,7 +176,7 @@ export function Sidebar() {
           <div className="flex h-full flex-col px-5 py-5">
             <DialogHeader className="flex-row items-center justify-between gap-3">
               <DialogTitle className="sr-only">Navigation</DialogTitle>
-              <Link href="/" className="inline-flex items-center">
+              <Link href="/overview" className="inline-flex items-center">
                 <Image src="/Logo_Yellow.svg" alt="Mustaqbil Bridge" width={148} height={50} />
               </Link>
               <Button

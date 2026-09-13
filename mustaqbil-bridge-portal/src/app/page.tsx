@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { HashRedirect } from '@/components/auth/hash-redirect';
 
 const stages = [
   { label: 'To do', note: 'Queued' },
@@ -28,6 +29,7 @@ export default async function Home() {
           'radial-gradient(circle at top left, rgba(255, 193, 7, 0.16), transparent 30%), linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%)',
       }}
     >
+      <HashRedirect />
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-6 lg:px-10">
         <header className="flex items-center justify-between gap-4">
           <Link href="/" className="inline-flex items-center">

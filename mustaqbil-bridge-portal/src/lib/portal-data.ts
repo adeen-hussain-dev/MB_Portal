@@ -306,11 +306,14 @@ export async function fetchTaskById(id: string) {
     const type = (a.attachment_type === 'link' || (!a.attachment_type && (url.includes('drive.google.com') || url.includes('youtube.com') || url.includes('youtu.be'))))
       ? 'link'
       : 'file'
+    const purpose = ((a as Record<string, unknown>).purpose === 'submission' ? 'submission' : 'reference') as 'reference' | 'submission'
     return {
       id: a.id,
       fileName: name,
       fileUrl: url,
       attachmentType: type,
+      purpose,
+      createdAt: (a as Record<string, unknown>).created_at ? String((a as Record<string, unknown>).created_at) : undefined,
     }
   })
 
@@ -642,6 +645,7 @@ export async function createTask(input: TaskInput) {
           file_url: fileUrl,
           file_name: fileName,
           attachment_type: attachmentType,
+          purpose: 'reference',
           uploaded_by: input.createdBy,
         })
         if (attInsertError) {
@@ -650,6 +654,7 @@ export async function createTask(input: TaskInput) {
               task_id: taskId,
               file_url: fileUrl,
               file_name: fileName,
+              purpose: 'reference',
               uploaded_by: input.createdBy,
             })
           } else {
@@ -668,6 +673,59 @@ export async function createTask(input: TaskInput) {
     assignee_email: input.assigneeEmail,
     attachments: input.attachments ? input.attachments.map(a => typeof a === 'object' && a !== null ? a.fileUrl : String(a)) : [],
   })
+}
+
+export async function addTaskAttachment(input: {
+  taskId: string
+  fileUrl: string
+  fileName?: string
+  attachmentType?: 'file' | 'link'
+  purpose?: 'reference' | 'submission'
+  uploadedBy: string
+}) {
+  const admin = createAdminClient()
+  const fileName = input.fileName || (input.fileUrl.split('/').pop() || 'attachment')
+  const isLink = input.fileUrl.includes('drive.google.com') || input.fileUrl.includes('youtube.com') || input.fileUrl.includes('youtu.be')
+  const attachmentType = input.attachmentType || (isLink ? 'link' : 'file')
+  const purpose = input.purpose || 'submission'
+
+  try {
+    const { data, error } = await admin
+      .from('task_attachments')
+      .insert({
+        task_id: input.taskId,
+        file_url: input.fileUrl,
+        file_name: fileName,
+        attachment_type: attachmentType,
+        purpose,
+        uploaded_by: input.uploadedBy,
+      })
+      .select('*')
+      .single()
+
+    if (error) {
+      if (error.message.includes('attachment_type')) {
+        const { data: fallbackData, error: fallbackError } = await admin
+          .from('task_attachments')
+          .insert({
+            task_id: input.taskId,
+            file_url: input.fileUrl,
+            file_name: fileName,
+            purpose,
+            uploaded_by: input.uploadedBy,
+          })
+          .select('*')
+          .single()
+
+        if (fallbackError) throw new Error(fallbackError.message)
+        return fallbackData
+      }
+      throw new Error(error.message)
+    }
+    return data
+  } catch (err) {
+    throw err
+  }
 }
 
 export async function updateTask(id: string, patch: Partial<TaskRow & Record<string, unknown>>) {
