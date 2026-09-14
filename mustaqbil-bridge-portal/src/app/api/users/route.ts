@@ -35,7 +35,15 @@ export async function POST(request: Request) {
   })
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  await admin.from('profiles').update({ role, domain, phone }).eq('id', data.user.id)
+  await admin.from('profiles').upsert({
+    id: data.user.id,
+    email,
+    full_name,
+    role: role || 'volunteer',
+    domain,
+    phone,
+    status: 'active',
+  })
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, user: data.user })
 }
